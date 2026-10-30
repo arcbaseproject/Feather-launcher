@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Feather</string>
+    <string name="settings">Feather settings</string>
+    <string name="search">Search apps</string>
+    <string name="no_apps">No apps</string>
+    <string name="all_apps">All apps</string>
+    <string name="swipe_hint">Swipe up for all apps. Long-press an app to add it to home.</string>
+    <string name="add_home">Add to home</string>
+    <string name="add_dock">Add to dock</string>
+    <string name="remove">Remove</string>
+    <string name="app_info">App info</string>
+    <string name="wallpaper">Wallpaper</string>
+    <string name="grid_too_small">Remove or move pinned apps before shrinking the grid.</string>
+    <string name="no_space">No free space</string>
+    <string name="cant_open">Can\'t open app</string>
+    <string name="settings_title">Settings</string>
+    <string name="navigate_back">Back</string>
+    <string name="color_theme">Color theme</string>
+    <string name="layout">Layout</string>
+    <string name="icon_size_value">%1$d dp</string>
+    <string name="appearance">Appearance</string>
+    <string name="behavior">Behavior</string>
+    <string name="performance">Performance</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="icon_size">Icon size (dp)</string>
+    <string name="labels">Show app labels</string>
+    <string name="home_cols">Home columns</string>
+    <string name="home_rows">Home rows</string>
+    <string name="drawer_cols">App drawer columns</string>
+    <string name="animations">Animations</string>
+    <string name="autofocus">Focus search when opening apps</string>
+    <string name="low_mem">Minimal memory mode</string>
+    <string name="low_mem_desc">Frees app drawer icons when it closes. Reopening reloads them.</string>
+</resources>
