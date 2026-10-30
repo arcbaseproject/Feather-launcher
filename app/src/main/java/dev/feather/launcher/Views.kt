@@ -11,7 +11,10 @@ import android.widget.TextView
 
 /** One app: a TextView with the icon as its top compound drawable. No nested layout. */
 class IconView(ctx: Context) : TextView(ctx) {
-    var app: App? = null
+    /** An App or a Folder. */
+    var item: Any? = null
+    val app get() = item as? App
+    val folder get() = item as? Folder
     var cell = -1
 
     init {
@@ -67,9 +70,10 @@ class CellGrid(ctx: Context) : ViewGroup(ctx) {
         val rtl = layoutDirection == View.LAYOUT_DIRECTION_RTL
         for (i in 0 until childCount) {
             val v = getChildAt(i) as IconView
-            val col = v.cell % cols
+            val pos = v.cell % PAGE_STRIDE
+            val col = pos % cols
             val x = (if (rtl) cols - 1 - col else col) * cw
-            val y = v.cell / cols * ch + (ch - v.measuredHeight) / 2
+            val y = pos / cols * ch + (ch - v.measuredHeight) / 2
             v.layout(x, y, x + cw, y + v.measuredHeight)
         }
     }
@@ -78,5 +82,26 @@ class CellGrid(ctx: Context) : ViewGroup(ctx) {
         val col = (x / cw).toInt().coerceIn(0, cols - 1)
         val row = (y / ch).toInt().coerceIn(0, rows - 1)
         return row * cols + if (layoutDirection == View.LAYOUT_DIRECTION_RTL) cols - 1 - col else col
+    }
+}
+
+/** Home page indicator: one dot per page, the current one opaque. Draws nothing for a single page. */
+class PageDots(ctx: Context) : View(ctx) {
+    var count = 1
+        set(v) { if (field != v) { field = v; invalidate() } }
+    var current = 0
+        set(v) { if (field != v) { field = v; invalidate() } }
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
+    private val r = 3.5f * resources.displayMetrics.density
+
+    override fun onDraw(c: Canvas) {
+        if (count < 2) return
+        val gap = r * 4
+        var x = (width - (count - 1) * gap) / 2
+        for (i in 0 until count) {
+            paint.alpha = if (i == current) 255 else 90
+            c.drawCircle(x, height / 2f, r, paint)
+            x += gap
+        }
     }
 }

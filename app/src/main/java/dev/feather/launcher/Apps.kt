@@ -10,6 +10,8 @@ import android.content.pm.LauncherActivityInfo
 import android.content.pm.LauncherApps
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
@@ -81,20 +83,44 @@ object Apps {
         onChange?.invoke()
     }
 
-    /** Worker thread. Rasterizes once at display size into a HARDWARE bitmap: one GPU copy, no Java heap copy. */
-    fun loadIcon(app: App, px: Int): Bitmap {
-        icons[app.key]?.let { return it }
+    private fun drawable(app: App): Drawable {
         val pm = ctx.packageManager
-        var d = runCatching { app.info.getIcon(ctx.resources.displayMetrics.densityDpi) }.getOrNull()
+        val d = runCatching { app.info.getIcon(ctx.resources.displayMetrics.densityDpi) }.getOrNull()
             ?: pm.defaultActivityIcon
-        if (app.user != Process.myUserHandle()) d = pm.getUserBadgedIcon(d, app.user)
-        val soft = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        d.setBounds(0, 0, px, px)
-        d.draw(Canvas(soft))
+        return if (app.user != Process.myUserHandle()) pm.getUserBadgedIcon(d, app.user) else d
+    }
+
+    /** One GPU copy, no Java heap copy. */
+    private fun cacheAsHardware(key: String, soft: Bitmap): Bitmap {
         val bitmap = soft.copy(Bitmap.Config.HARDWARE, false) ?: soft
         if (bitmap !== soft) soft.recycle()
-        icons.put(app.key, bitmap)
+        icons.put(key, bitmap)
         return bitmap
+    }
+
+    /** Worker thread. Rasterizes once at display size into a HARDWARE bitmap. */
+    fun loadIcon(app: App, px: Int): Bitmap {
+        icons[app.key]?.let { return it }
+        val soft = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+        drawable(app).apply { setBounds(0, 0, px, px) }.draw(Canvas(soft))
+        return cacheAsHardware(app.key, soft)
+    }
+
+    /** Worker thread. A 2x2 preview of the first four apps on a rounded square. */
+    fun loadFolderIcon(key: String, apps: List<App>, px: Int, bg: Int): Bitmap {
+        icons[key]?.let { return it }
+        val soft = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+        val c = Canvas(soft)
+        c.drawRoundRect(0f, 0f, px.toFloat(), px.toFloat(), px * 0.3f, px * 0.3f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bg })
+        val cell = (px * 0.34f).toInt()
+        val gap = (px * 0.06f).toInt()
+        val start = (px - 2 * cell - gap) / 2
+        apps.take(4).forEachIndexed { i, app ->
+            val l = start + i % 2 * (cell + gap)
+            val t = start + i / 2 * (cell + gap)
+            drawable(app).apply { setBounds(l, t, l + cell, t + cell) }.draw(c)
+        }
+        return cacheAsHardware(key, soft)
     }
 
     const val LOW_CACHE = 2 shl 20
@@ -117,9 +143,40 @@ fun parseLayout(s: String?): MutableMap<Int, String> {
     return map
 }
 
+/** A named group of app keys. Home folders sit in a layout cell as `key`; drawer folders hide their apps from the drawer list. */
+class Folder(val id: Int, var name: String, val keys: MutableList<String>, val drawer: Boolean) {
+    val key get() = FOLDER_PREFIX + id
+}
+
+const val FOLDER_PREFIX = "folder:"
+
+/** One folder per line, tab-separated: id, 1 for a drawer folder, name, comma-separated app keys. */
+fun parseFolders(s: String?): MutableMap<Int, Folder> {
+    val map = HashMap<Int, Folder>()
+    for (line in s.orEmpty().lineSequence()) {
+        val f = line.split('\t')
+        val id = f.getOrNull(0)?.toIntOrNull() ?: continue
+        if (f.size != 4) continue
+        map[id] = Folder(id, f[2], f[3].split(',').filter { it.isNotEmpty() }.toMutableList(), f[1] == "1")
+    }
+    return map
+}
+
+private val SEPARATORS = Regex("[\t\r\n]")
+
+fun serializeFolders(map: Map<Int, Folder>) = map.values.sortedBy { it.id }.joinToString("\n") {
+    "${it.id}\t${if (it.drawer) 1 else 0}\t${SEPARATORS.replace(it.name, " ")}\t${it.keys.joinToString(",")}"
+}
+
 fun serializeLayout(map: Map<Int, String>) = map.entries.sortedBy { it.key }.joinToString("\n") { "${it.key} ${it.value}" }
 
-fun layoutFits(map: Map<Int, String>, capacity: Int) = map.keys.all { it < capacity }
+/** Home cells are `page * PAGE_STRIDE + position`, so resizing the grid never moves apps across pages. */
+const val PAGE_STRIDE = 1000
+
+fun layoutFits(map: Map<Int, String>, capacity: Int) = map.keys.all { it % PAGE_STRIDE < capacity }
+
+/** Pages holding at least one cell, counting from page 0. */
+fun pageCount(map: Map<Int, String>) = (map.keys.maxOrNull() ?: 0) / PAGE_STRIDE + 1
 
 /** Byte-bounded LRU, thread-safe. Evicted bitmaps are not recycled: a view may still draw them. */
 class IconLru<V : Any>(var maxBytes: Int, private val sizeOf: (V) -> Int) {

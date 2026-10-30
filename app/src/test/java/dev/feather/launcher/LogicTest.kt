@@ -31,6 +31,22 @@ class LogicTest {
         assertTrue(!layoutFits(home, 4 * 4))
         assertTrue(layoutFits(home, 4 * 5))
         assertTrue(layoutFits(emptyMap(), 3))
+        assertTrue(layoutFits(mapOf(PAGE_STRIDE + 3 to "app"), 4)) // position 3 on page 2
+        assertEquals(2, pageCount(mapOf(0 to "a", PAGE_STRIDE + 3 to "b")))
+        assertEquals(1, pageCount(emptyMap()))
+    }
+
+    @Test fun foldersRoundTrip() {
+        val m = mapOf(
+            1 to Folder(1, "Work\tstuff\n", mutableListOf("com.a/.Main#0", "com.b/.B#10"), drawer = false),
+            4 to Folder(4, "", mutableListOf("com.c/.C#0"), drawer = true),
+        )
+        val back = parseFolders(serializeFolders(m))
+        assertEquals("Work stuff ", back.getValue(1).name) // separators can't break the format
+        assertEquals(listOf("com.a/.Main#0", "com.b/.B#10"), back.getValue(1).keys)
+        assertTrue(back.getValue(4).drawer)
+        assertEquals("folder:4", back.getValue(4).key)
+        assertEquals(emptyMap<Int, Folder>(), parseFolders("junk\n1\tx\n"))
     }
 
     @Test fun lruEvictsLeastRecentlyUsedByBytes() {

@@ -34,4 +34,9 @@
     <string name="autofocus">Focus search when opening apps</string>
     <string name="low_mem">Minimal memory mode</string>
     <string name="low_mem_desc">Frees app drawer icons when it closes. Reopening reloads them.</string>
+    <string name="folder">Folder</string>
+    <string name="folder_desc">Folder: %1$s</string>
+    <string name="rename">Rename</string>
+    <string name="ungroup">Ungroup</string>
+    <string name="remove_from_folder">Remove from folder</string>
 </resources>
