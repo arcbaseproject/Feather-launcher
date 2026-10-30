@@ -5,3 +5,4 @@ local.properties
 *.iml
 bench-*.txt
 .kotlin/
+keystore.properties
