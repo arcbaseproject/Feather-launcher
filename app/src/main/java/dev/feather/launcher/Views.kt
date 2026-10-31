@@ -1,5 +1,6 @@
 package dev.feather.launcher
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -10,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 
 /** One app: a TextView with the icon as its top compound drawable. No nested layout. */
+@SuppressLint("AppCompatCustomView") // Used by the platform Activity; AppCompat tinting is not needed.
 class IconView(ctx: Context) : TextView(ctx) {
     /** An App or a Folder. */
     var item: Any? = null

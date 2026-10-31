@@ -5,6 +5,7 @@ import android.app.ActivityOptions
 import android.app.Dialog
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.graphics.Bitmap
@@ -16,6 +17,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.content.res.ColorStateList
 import android.graphics.Typeface
+import android.net.Uri
 import android.view.animation.PathInterpolator
 import android.os.Bundle
 import android.text.Editable
@@ -38,6 +40,7 @@ import android.widget.FrameLayout
 import android.widget.GridView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import android.window.OnBackInvokedDispatcher
@@ -86,7 +89,12 @@ class MainActivity : Activity() {
     // One worker: icon rasterizing is the only off-main work.
     private val worker: ExecutorService = Executors.newSingleThreadExecutor()
     private val back = android.window.OnBackInvokedCallback { closeDrawer(animate) }
-    private val onApps = { refresh() }
+    private val onApps = {
+        homeMap = parseLayout(layoutPrefs.getString("home", null))
+        dockMap = parseLayout(layoutPrefs.getString("dock", null))
+        folders = parseFolders(layoutPrefs.getString("folders", null))
+        refresh()
+    }
     private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> settingsChanged = true }
 
     override fun onCreate(state: Bundle?) {
@@ -314,7 +322,11 @@ class MainActivity : Activity() {
         val dir = if (p > page) 1 else -1
         page = p
         dots.current = p
-        if (!animate) return bindGrid(home, homeMap)
+        if (!animate || dragFrom != null) {
+            home.animate().cancel()
+            home.translationX = 0f
+            return bindGrid(home, homeMap)
+        }
         val w = home.width * if (home.layoutDirection == View.LAYOUT_DIRECTION_RTL) -1f else 1f
         home.animate().cancel()
         home.animate().translationX(-dir * w).setDuration(120).setInterpolator(EMPHASIZED_ACCELERATE).withEndAction {
@@ -421,6 +433,23 @@ class MainActivity : Activity() {
         val label = label(item)
         if (v.textSize > 0f) v.text = label
         v.contentDescription = if (item is Folder) getString(R.string.folder_desc, label) else label
+        v.accessibilityDelegate = object : View.AccessibilityDelegate() {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                if (host.parent === home || host.parent === dock || host.parent === grid) {
+                    info.addAction(AccessibilityNodeInfo.AccessibilityAction(R.id.action_menu, getString(R.string.app_menu)))
+                }
+            }
+
+            override fun performAccessibilityAction(host: View, action: Int, args: Bundle?): Boolean {
+                if ((host.parent === home || host.parent === dock || host.parent === grid) &&
+                    (action == R.id.action_menu || action == AccessibilityNodeInfo.ACTION_LONG_CLICK)) {
+                    menuFor(v, v.parent as? CellGrid)
+                    return true
+                }
+                return super.performAccessibilityAction(host, action, args)
+            }
+        }
         // A folder's icon changes with its contents, so its cache key does too.
         val key = if (item is App) item.key else "F$folderBg:" + (item as Folder).keys.joinToString(",")
         val cached = Apps.icons[key]
@@ -482,6 +511,10 @@ class MainActivity : Activity() {
 
     /** Starts a drag. The view hides; the shadow follows the finger and the target highlights. */
     private fun lift(v: View) {
+        if (!v.isInTouchMode) {
+            menuFor(v as IconView, v.parent as? CellGrid)
+            return
+        }
         dragFrom = v.parent as? CellGrid
         dragCell = (v as IconView).cell
         v.startDragAndDrop(null, View.DragShadowBuilder(v), v, 0)
@@ -675,6 +708,7 @@ class MainActivity : Activity() {
                         popup.menu.item(getString(R.string.app_info)) {
                             runCatching { Apps.launcherApps.startAppDetailsActivity(app.info.componentName, app.user, null, null) }
                         }
+                        uninstallItem(popup.menu, app) { dialog.dismiss() }
                         popup.show()
                         true
                     }
@@ -686,7 +720,9 @@ class MainActivity : Activity() {
             val pad = (16 * dp).toInt()
             setPadding(pad, pad, pad, pad)
             addView(name, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = pad })
-            addView(list, LinearLayout.LayoutParams(-1, list.rows * cellH))
+            addView(ScrollView(context).apply {
+                addView(list, ViewGroup.LayoutParams(-1, list.rows * cellH))
+            }, LinearLayout.LayoutParams(-1, minOf(list.rows * cellH, (resources.displayMetrics.heightPixels * 0.6f).toInt())))
         })
         dialog.window?.setBackgroundDrawable(GradientDrawable().apply {
             cornerRadius = 28 * dp
@@ -790,7 +826,21 @@ class MainActivity : Activity() {
         m.item(getString(R.string.app_info)) {
             runCatching { Apps.launcherApps.startAppDetailsActivity(app.info.componentName, app.user, null, null) }
         }
+        uninstallItem(m, app)
         popup.show()
+    }
+
+    /** System apps can't be uninstalled, only disabled in App info, so they get no item. */
+    private fun uninstallItem(m: Menu, app: App, before: () -> Unit = {}) {
+        if (app.info.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0) return
+        m.item(getString(R.string.uninstall)) {
+            before()
+            // The system asks to confirm. EXTRA_USER targets the right profile; Android tells Apps when it's gone.
+            val intent = Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.info.componentName.packageName, null))
+                .putExtra(Intent.EXTRA_USER, app.user)
+            runCatching { startActivity(intent) }
+                .onFailure { Toast.makeText(this, R.string.cant_open, Toast.LENGTH_SHORT).show() }
+        }
     }
 
     private fun homeMenu() {

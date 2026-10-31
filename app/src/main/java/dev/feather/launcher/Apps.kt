@@ -2,12 +2,14 @@ package dev.feather.launcher
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherActivityInfo
 import android.content.pm.LauncherApps
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -79,8 +81,38 @@ object Apps {
             runCatching { launcherApps.getActivityList(null, user) }.getOrNull().orEmpty().map(::App)
         }.sortedWith(compareBy(collator) { it.label })
         byKey = list.associateBy { it.key }
+        pruneUninstalledApps()
         icons.clear()
         onChange?.invoke()
+    }
+
+    private fun pruneUninstalledApps() {
+        val prefs = Prefs.layout(ctx)
+        val home = parseLayout(prefs.getString("home", null))
+        val dock = parseLayout(prefs.getString("dock", null))
+        val folders = parseFolders(prefs.getString("folders", null))
+        val users = ctx.getSystemService(UserManager::class.java)
+        val profiles = users.userProfiles.associateBy { it.hashCode() }
+        val keys = (home.values + dock.values + folders.values.flatMap { it.keys }).toSet()
+        val removed = keys.filterTo(HashSet()) { key ->
+            if (key in byKey || key.startsWith(FOLDER_PREFIX)) return@filterTo false
+            val user = profiles[key.substringAfterLast('#').toIntOrNull()] ?: return@filterTo false
+            val component = ComponentName.unflattenFromString(key.substringBeforeLast('#')) ?: return@filterTo false
+            try {
+                if (!users.isUserUnlocked(user) || users.isQuietModeEnabled(user)) return@filterTo false
+                // Keep installed apps on unavailable storage; only confirmed uninstalls free slots.
+                val info = launcherApps.getApplicationInfo(component.packageName, PackageManager.MATCH_UNINSTALLED_PACKAGES, user)
+                info == null || info.flags and ApplicationInfo.FLAG_INSTALLED == 0
+            } catch (_: PackageManager.NameNotFoundException) {
+                true
+            } catch (_: RuntimeException) {
+                false // An inaccessible profile is not evidence of an uninstall.
+            }
+        }
+        if (removed.isEmpty()) return
+        removeApps(home, dock, folders, removed)
+        prefs.edit().putString("home", serializeLayout(home)).putString("dock", serializeLayout(dock))
+            .putString("folders", serializeFolders(folders)).apply()
     }
 
     private fun drawable(app: App): Drawable {
@@ -149,6 +181,21 @@ class Folder(val id: Int, var name: String, val keys: MutableList<String>, val d
 }
 
 const val FOLDER_PREFIX = "folder:"
+
+/** Remove confirmed uninstalls and collapse folders without disturbing unavailable apps. */
+fun removeApps(home: MutableMap<Int, String>, dock: MutableMap<Int, String>, folders: MutableMap<Int, Folder>, removed: Set<String>) {
+    for (map in listOf(home, dock)) map.entries.removeAll { it.value in removed }
+    for (f in folders.values.toList()) {
+        if (!f.keys.removeAll(removed) || f.keys.size >= 2) continue
+        folders.remove(f.id)
+        for (map in listOf(home, dock)) {
+            for ((cell, key) in map.toMap()) if (key == f.key) {
+                val last = f.keys.firstOrNull()
+                if (last == null) map.remove(cell) else map[cell] = last
+            }
+        }
+    }
+}
 
 /** One folder per line, tab-separated: id, 1 for a drawer folder, name, comma-separated app keys. */
 fun parseFolders(s: String?): MutableMap<Int, Folder> {

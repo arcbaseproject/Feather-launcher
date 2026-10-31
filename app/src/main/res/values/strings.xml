@@ -10,6 +10,8 @@
     <string name="add_dock">Add to dock</string>
     <string name="remove">Remove</string>
     <string name="app_info">App info</string>
+    <string name="app_menu">App menu</string>
+    <string name="uninstall">Uninstall</string>
     <string name="wallpaper">Wallpaper</string>
     <string name="grid_too_small">Remove or move pinned apps before shrinking the grid.</string>
     <string name="no_space">No free space</string>
@@ -39,4 +41,19 @@
     <string name="rename">Rename</string>
     <string name="ungroup">Ungroup</string>
     <string name="remove_from_folder">Remove from folder</string>
+    <string name="appearance_desc">Theme, icon size and labels</string>
+    <string name="layout_desc">Home grid and app drawer</string>
+    <string name="behavior_desc">Animations and search</string>
+    <string name="performance_desc">Memory use</string>
+    <string name="home_screen">Home screen</string>
+    <string name="app_drawer">App drawer</string>
+    <string name="about">About</string>
+    <string name="version">Version %1$s</string>
+    <string name="about_tagline">A lightweight home app. No network access, one permission.</string>
+    <string name="source_code">Source code</string>
+    <string name="source_code_desc">View the project on GitHub</string>
+    <string name="report_issue">Report an issue</string>
+    <string name="report_issue_desc">Bugs and feature requests</string>
+    <string name="license">License</string>
+    <string name="license_desc">MIT License</string>
 </resources>

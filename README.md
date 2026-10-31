@@ -4,11 +4,11 @@
 
 **An Android home app with a home grid, a dock and a searchable app drawer.**
 
-It looks like stock Android, asks for zero permissions and has no network code.
+It looks like stock Android, asks for one permission (to uninstall apps) and has no network code.
 
 ![Android 13+](https://img.shields.io/badge/Android-13%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
-![Permissions](https://img.shields.io/badge/permissions-0-blue)
+![Permissions](https://img.shields.io/badge/permissions-1-blue)
 ![Internet](https://img.shields.io/badge/internet-none-critical)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -74,7 +74,7 @@ It looks like stock Android, asks for zero permissions and has no network code.
 | | |
 |---|---|
 | **Plain Android views on the home screen** | The launcher uses `Activity`, `GridView` and one custom grid view. Only the settings screen loads Material Components. |
-| **Zero permissions** | `LauncherApps` needs no permission. A `<queries>` entry lets Feather see launchable apps without `QUERY_ALL_PACKAGES`. |
+| **One permission** | `LauncherApps` needs no permission. A `<queries>` entry lets Feather see launchable apps without `QUERY_ALL_PACKAGES`. The only permission, `REQUEST_DELETE_PACKAGES`, backs the Uninstall item. |
 | **Icons drawn once, at display size** | Feather draws each icon into a `HARDWARE` bitmap, which keeps one copy on the GPU and none on the Java heap. A size-capped LRU cache saves reloading them. |
 | **Minimal memory mode, on by default** | Closing the drawer releases its icons and runs one garbage collection. With the mode off, memory stays about 72 MiB higher after you open the drawer. |
 | **No background work** | Feather runs no services, polls nothing and schedules no wakeups. Android tells it when you install or remove an app. An idle home screen draws 0 frames. |
@@ -143,9 +143,9 @@ Gradle signs the release build with your local debug key so you can install it. 
 | Swipe up | Opens the app drawer |
 | Swipe down at the top of the list, Back, or Home | Closes the drawer |
 | Tap | Opens the app |
-| Long-press in the drawer | Shortcuts · Add to home · Add to dock · App info |
+| Long-press in the drawer | Shortcuts · Add to home · Add to dock · App info · Uninstall |
 | Long-press and drag on home | Moves the icon; the target cell highlights |
-| Long-press on home without moving | Shortcuts · Remove · App info |
+| Long-press on home without moving | Shortcuts · Remove · App info · Uninstall |
 | Long-press empty home | Wallpaper · Settings |
 
 Android shows app shortcuts only to the default home app, so set Feather as default to get them.
@@ -182,7 +182,6 @@ benchmark.sh             adb benchmark script
 ## Not included
 
 Widgets, icon packs, notification dots, feeds, weather and a frequent-apps row.
-Feather also has no uninstall item: it would need an extra permission, and App info already has an Uninstall button.
 
 ## License
 

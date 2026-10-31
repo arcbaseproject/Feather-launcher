@@ -2,6 +2,7 @@
 <resources>
     <color name="icon_bg">#1E3A5F</color>
     <item name="action_apps" type="id" />
+    <item name="action_menu" type="id" />
 
     <style name="Theme.Feather" parent="@android:style/Theme.DeviceDefault.DayNight">
         <item name="android:windowNoTitle">true</item>

@@ -6,6 +6,25 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LogicTest {
+    @Test fun uninstallsFreeSlotsAndCollapseFolders() {
+        val home = mutableMapOf(0 to "removed", PAGE_STRIDE to "folder:1", 2 to "folder:2")
+        val dock = mutableMapOf(0 to "removed", 1 to "folder:1", 2 to "paused")
+        val folders = mutableMapOf(
+            1 to Folder(1, "Pair", mutableListOf("removed", "remaining"), false),
+            2 to Folder(2, "Empty", mutableListOf("removed"), false),
+            3 to Folder(3, "Drawer", mutableListOf("removed", "paused", "unmounted"), true),
+            4 to Folder(4, "Untouched", mutableListOf("paused"), false),
+        )
+        removeApps(home, dock, folders, setOf("removed"))
+        assertEquals(mapOf(PAGE_STRIDE to "remaining"), home)
+        assertEquals(mapOf(1 to "remaining", 2 to "paused"), dock)
+        assertEquals(setOf(3, 4), folders.keys)
+        assertEquals(listOf("paused", "unmounted"), folders.getValue(3).keys)
+        removeApps(home, dock, folders, setOf("remaining"))
+        assertTrue(home.isEmpty())
+        assertEquals(mapOf(2 to "paused"), dock)
+    }
+
     @Test fun searchIgnoresCaseAndAccents() {
         assertEquals("cafe", normalize("Café"))
         assertTrue("map" in normalize("Google Maps"))

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- No permissions. LauncherApps needs none; <queries> only makes launchable apps visible (Android 11+ package visibility). -->
+<!-- One permission, for the Uninstall menu item. LauncherApps needs none; <queries> only makes launchable apps visible (Android 11+ package visibility). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Normal permission: granted at install, no prompt. Each uninstall still asks the user to confirm. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <queries>
         <intent>
