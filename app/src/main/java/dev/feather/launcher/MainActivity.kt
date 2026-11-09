@@ -67,6 +67,12 @@ class MainActivity : Activity() {
     private var shown: List<Any> = emptyList()
     private var folderBg = 0
     private var hovered: View? = null
+    private val folderHover = FolderHover()
+    private var folderTarget: String? = null
+    private var folderPreview: View? = null
+    private var folderReady = false
+    private val prepareFolder = Runnable { updateFolderHover(folderTarget, folderPreview) }
+    private lateinit var undo: TextView
     private lateinit var dots: PageDots
     private var page = 0
     // Home/dock drag source, kept apart from the view: flipping pages mid-drag rebinds the grid.
@@ -90,6 +96,8 @@ class MainActivity : Activity() {
     private val worker: ExecutorService = Executors.newSingleThreadExecutor()
     private val back = android.window.OnBackInvokedCallback { closeDrawer(animate) }
     private val onApps = {
+        if (::undo.isInitialized) undo.visibility = View.GONE
+        updateFolderHover(null, null)
         homeMap = parseLayout(layoutPrefs.getString("home", null))
         dockMap = parseLayout(layoutPrefs.getString("dock", null))
         folders = parseFolders(layoutPrefs.getString("folders", null))
@@ -223,6 +231,19 @@ class MainActivity : Activity() {
             addView(homeColumn)
             addView(drawer)
             addView(anchor, 1, 1)
+            undo = TextView(context).apply {
+                setText(R.string.undo_layout)
+                textSize = 16f
+                gravity = Gravity.CENTER
+                minHeight = (48 * dp).toInt()
+                setPadding((24 * dp).toInt(), 0, (24 * dp).toInt(), 0)
+                setTextColor(getColor(if (night) android.R.color.system_neutral1_50 else android.R.color.system_neutral1_900))
+                setBackgroundColor(folderBg)
+                visibility = View.GONE
+            }
+            addView(undo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+                bottomMargin = (96 * dp).toInt()
+            })
             setOnApplyWindowInsetsListener { _, insets ->
                 val bars = WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
                 insets.getInsets(bars).run { homeColumn.setPadding(left, top, right, bottom) }
@@ -265,6 +286,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        updateFolderHover(null, null)
         if (Apps.onChange === onApps) Apps.onChange = null
         settings.unregisterOnSharedPreferenceChangeListener(settingsListener)
         worker.shutdownNow()
@@ -320,6 +342,7 @@ class MainActivity : Activity() {
     private fun showPage(p: Int) {
         if (p == page) return
         val dir = if (p > page) 1 else -1
+        updateFolderHover(null, null)
         page = p
         dots.current = p
         if (!animate || dragFrom != null) {
@@ -394,7 +417,7 @@ class MainActivity : Activity() {
     /** Searching lists matching apps, folders or not. Otherwise drawer folders replace the apps they hold. */
     private fun filter() {
         val q = normalize(search.text.toString().trim())
-        shown = if (q.isNotEmpty()) Apps.list.filter { q in it.search } else {
+        shown = if (q.isNotEmpty()) Apps.list.filter { q in it.search }.sortedBy { searchRank(it.search, q) } else {
             val drawerFolders = folders.values.filter { it.drawer && folderApps(it).isNotEmpty() }
             val grouped = drawerFolders.flatMapTo(HashSet()) { it.keys }
             (Apps.list.filter { it.key !in grouped } + drawerFolders).sortedWith(compareBy(Collator.getInstance(), ::label))
@@ -515,10 +538,14 @@ class MainActivity : Activity() {
             menuFor(v as IconView, v.parent as? CellGrid)
             return
         }
+        updateFolderHover(null, null)
         dragFrom = v.parent as? CellGrid
         dragCell = (v as IconView).cell
-        v.startDragAndDrop(null, View.DragShadowBuilder(v), v, 0)
-        v.alpha = 0f
+        if (v.startDragAndDrop(null, View.DragShadowBuilder(v), v, 0)) v.alpha = 0f
+        else {
+            dragFrom = null
+            dragCell = -1
+        }
     }
 
     /** Long-press without moving still drops: show the menu instead. */
@@ -533,6 +560,12 @@ class MainActivity : Activity() {
         when (e.action) {
             DragEvent.ACTION_DRAG_LOCATION -> {
                 to.hover = to.cellAt(e.x, e.y)
+                val cell = cellIn(to, to.hover)
+                val key = mapFor(to)[cell]
+                val eligible = dragFrom != null && v.app != null &&
+                    !(to === dragFrom && cell == dragCell) &&
+                    (Apps.byKey[key] != null || folderFor(key) != null)
+                updateFolderHover(if (eligible) "${if (to === home) "home" else "dock"}:$cell" else null, to)
                 if (to === home) {
                     val side = when { e.x < edgePx -> -1; e.x > to.width - edgePx -> 1; else -> 0 }
                     edge(if (to.layoutDirection == View.LAYOUT_DIRECTION_RTL) -side else side)
@@ -540,6 +573,7 @@ class MainActivity : Activity() {
             }
             DragEvent.ACTION_DRAG_EXITED -> {
                 to.hover = -1
+                updateFolderHover(null, null)
                 if (to === home) edge(0)
             }
             DragEvent.ACTION_DROP -> {
@@ -548,14 +582,17 @@ class MainActivity : Activity() {
                 val from = dragFrom ?: return@OnDragListener false
                 val cell = cellIn(to, to.cellAt(e.x, e.y))
                 val targetKey = mapFor(to)[cell]
+                val groupReady = folderReady && folderTarget == "${if (to === home) "home" else "dock"}:$cell"
+                updateFolderHover(null, null)
                 when {
                     to === from && cell == dragCell -> menuFor(v, from)
-                    // An app dropped on an app or a folder groups them.
-                    v.app != null && (Apps.byKey[targetKey] != null || folderFor(targetKey) != null) -> group(from, dragCell, to, cell)
+                    // An app dropped on an app or a folder groups them after the hover delay.
+                    groupReady && v.app != null && (Apps.byKey[targetKey] != null || folderFor(targetKey) != null) -> group(from, dragCell, to, cell)
                     else -> move(from, dragCell, to, cell)
                 }
             }
             DragEvent.ACTION_DRAG_ENDED -> {
+                updateFolderHover(null, null)
                 to.hover = -1
                 edge(0)
                 v.alpha = 1f
@@ -604,11 +641,19 @@ class MainActivity : Activity() {
         if (v.parent !== grid) return@OnDragListener false
         val pos = grid.pointToPosition(e.x.toInt(), e.y.toInt())
         when (e.action) {
-            DragEvent.ACTION_DRAG_LOCATION -> hover(grid.getChildAt(pos - grid.firstVisiblePosition))
-            DragEvent.ACTION_DRAG_EXITED -> hover(null)
+            DragEvent.ACTION_DRAG_LOCATION -> {
+                val target = shown.getOrNull(pos)
+                val child = grid.getChildAt(pos - grid.firstVisiblePosition)
+                hover(child)
+                updateFolderHover(if (target != null && target !== v.item && child != null) "drawer:$pos" else null, child)
+            }
+            DragEvent.ACTION_DRAG_EXITED -> { hover(null); updateFolderHover(null, null) }
             DragEvent.ACTION_DROP -> {
                 hover(null)
                 val app = v.app ?: return@OnDragListener false
+                val groupReady = folderReady && folderTarget == "drawer:$pos"
+                updateFolderHover(null, null)
+                if (!groupReady && shown.getOrNull(pos) !== app) return@OnDragListener true
                 when (val target = shown.getOrNull(pos)) {
                     app -> menuFor(v, null)
                     is Folder -> {
@@ -625,11 +670,29 @@ class MainActivity : Activity() {
                 }
             }
             DragEvent.ACTION_DRAG_ENDED -> {
+                updateFolderHover(null, null)
                 hover(null)
                 v.alpha = 1f
             }
         }
         true
+    }
+
+    private fun updateFolderHover(target: String?, preview: View?) {
+        home.removeCallbacks(prepareFolder)
+        if (folderPreview !== preview || folderTarget != target) {
+            (folderPreview as? CellGrid)?.folderReady = false
+            if (folderPreview !is CellGrid) folderPreview?.apply { scaleX = 1f; scaleY = 1f }
+        }
+        folderTarget = target
+        folderPreview = preview
+        folderReady = folderHover.update(target, android.os.SystemClock.uptimeMillis())
+        (preview as? CellGrid)?.folderReady = folderReady
+        if (preview !is CellGrid) preview?.apply {
+            scaleX = if (folderReady) 1.15f else 1f
+            scaleY = scaleX
+        }
+        if (target != null && !folderReady) home.postDelayed(prepareFolder, 500)
     }
 
     /** Shows the drop target in the drawer with the item's pressed highlight. */
@@ -777,7 +840,22 @@ class MainActivity : Activity() {
         saveAndRebind()
     }
 
-    private fun saveAndRebind() {
+    private fun saveAndRebind(offerUndo: Boolean = true) {
+        val before = if (offerUndo) listOf(
+            layoutPrefs.getString("home", "").orEmpty(),
+            layoutPrefs.getString("dock", "").orEmpty(),
+            layoutPrefs.getString("folders", "").orEmpty(),
+        ) else null
+        if (before != null) {
+            undo.visibility = View.VISIBLE
+            undo.setOnClickListener {
+                homeMap = parseLayout(before[0])
+                dockMap = parseLayout(before[1])
+                folders = parseFolders(before[2])
+                undo.visibility = View.GONE
+                saveAndRebind(offerUndo = false)
+            }
+        } else undo.visibility = View.GONE
         layoutPrefs.edit()
             .putString("home", serializeLayout(homeMap))
             .putString("dock", serializeLayout(dockMap))

@@ -253,3 +253,24 @@ class IconLru<V : Any>(var maxBytes: Int, private val sizeOf: (V) -> Int) {
         }
     }
 }
+
+/** Input and query are already normalized; stable sorting keeps alphabetical ties. */
+fun searchRank(name: String, query: String): Int = when {
+    name == query -> 0
+    name.startsWith(query) -> 1
+    query in name -> 2
+    else -> 3
+}
+
+/** A different target must earn its own dwell time. */
+class FolderHover {
+    private var target: String? = null
+    private var since = 0L
+    fun update(next: String?, now: Long): Boolean {
+        if (next != target) {
+            target = next
+            since = now
+        }
+        return next != null && now - since >= 500
+    }
+}

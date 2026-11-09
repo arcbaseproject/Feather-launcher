@@ -38,6 +38,7 @@ It looks like stock Android, asks for one permission (to uninstall apps) and has
 - Swipe up from anywhere on the home screen
 - Alphabetical list with a fast-scroll thumb
 - Search ignores case and accents: "cafe" finds "Café"
+- Search ranks exact names first, then prefixes, then other matches
 - Enter opens the first result
 
 </td>
@@ -47,6 +48,9 @@ It looks like stock Android, asks for one permission (to uninstall apps) and has
 - Long-press an icon and drag it
 - The cell under your finger lights up
 - Drop it on another app and the two swap places
+- Hold over an app for 500 ms to prepare a folder; the target outline shows when ready
+- Drawer folder targets enlarge when ready
+- Undo the latest layout change using the on-screen button
 
 ### More
 - App shortcuts in the long-press menu
@@ -144,7 +148,7 @@ Gradle signs the release build with your local debug key so you can install it. 
 | Swipe down at the top of the list, Back, or Home | Closes the drawer |
 | Tap | Opens the app |
 | Long-press in the drawer | Shortcuts · Add to home · Add to dock · App info · Uninstall |
-| Long-press and drag on home | Moves the icon; the target cell highlights |
+| Long-press and drag on home | Moves the icon; hold over another app to create a folder |
 | Long-press on home without moving | Shortcuts · Remove · App info · Uninstall |
 | Long-press empty home | Wallpaper · Settings |
 

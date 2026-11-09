@@ -20,8 +20,9 @@ android {
         // 33: OnBackInvokedCallback (targetSdk 37 never calls onBackPressed).
         minSdk = 33
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        testInstrumentationRunner = "dev.feather.launcher.LauncherUiTest"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     signingConfigs {

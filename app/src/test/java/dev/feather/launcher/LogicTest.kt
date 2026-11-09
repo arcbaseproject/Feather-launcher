@@ -6,6 +6,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LogicTest {
+    @Test fun searchRanksExactThenPrefixThenSubstring() {
+        val names = listOf("Google Maps", "Maps Go", "Maps", "Camera")
+        val q = normalize("Máps")
+        assertEquals(listOf("Maps", "Maps Go", "Google Maps"),
+            names.filter { q in normalize(it) }.sortedBy { searchRank(normalize(it), q) })
+        assertEquals(3, searchRank("camera", q))
+    }
+
+    @Test fun folderHoverRequiresContinuousDwellOnSameTarget() {
+        val hover = FolderHover()
+        assertTrue(!hover.update("home:0", 0))
+        assertTrue(!hover.update("home:0", 499))
+        assertTrue(hover.update("home:0", 500))
+        assertTrue(!hover.update("home:1", 501))
+        assertTrue(!hover.update(null, 1001))
+        assertTrue(!hover.update("home:1", 1002))
+        assertTrue(hover.update("home:1", 1502))
+        assertTrue(!hover.update("dock:1", 1503))
+    }
+
     @Test fun uninstallsFreeSlotsAndCollapseFolders() {
         val home = mutableMapOf(0 to "removed", PAGE_STRIDE to "folder:1", 2 to "folder:2")
         val dock = mutableMapOf(0 to "removed", 1 to "folder:1", 2 to "paused")

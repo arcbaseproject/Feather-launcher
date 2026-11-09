@@ -8,6 +8,7 @@
     <string name="swipe_hint">Swipe up for all apps. Long-press an app to add it to home.</string>
     <string name="add_home">Add to home</string>
     <string name="add_dock">Add to dock</string>
+    <string name="undo_layout">Undo layout change</string>
     <string name="remove">Remove</string>
     <string name="app_info">App info</string>
     <string name="app_menu">App menu</string>

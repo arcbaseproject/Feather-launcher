@@ -43,6 +43,8 @@ class CellGrid(ctx: Context) : ViewGroup(ctx) {
             if (field != v) invalidate()
             field = v
         }
+    var folderReady = false
+        set(v) { if (field != v) { field = v; invalidate() } }
     private val hoverPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x40FFFFFF }
     private val radius = 20 * resources.displayMetrics.density
 
@@ -58,6 +60,9 @@ class CellGrid(ctx: Context) : ViewGroup(ctx) {
         val h = minOf(ch, cw * 6 / 5).toFloat()
         val y = hover / cols * ch + (ch - h) / 2
         val inset = radius / 4
+        hoverPaint.style = if (folderReady) Paint.Style.STROKE else Paint.Style.FILL
+        hoverPaint.strokeWidth = 3 * resources.displayMetrics.density
+        hoverPaint.alpha = if (folderReady) 255 else 64
         c.drawRoundRect(x + inset, y + inset, x + cw - inset, y + h - inset, radius, radius, hoverPaint)
     }
 
